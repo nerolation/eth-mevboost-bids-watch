@@ -1,0 +1,4 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pyxatu>=1.10.0
+pandas>=2.0.0

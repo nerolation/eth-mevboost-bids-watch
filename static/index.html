@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MEV Builder Bids Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+    <div class="dashboard">
+        <header class="header">
+            <div class="header-content">
+                <h1 class="title">MEV Builder Bids</h1>
+                <div class="slot-info">
+                    <span class="slot-label">Slot</span>
+                    <span class="slot-number" id="slotNumber">--</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="chart-container">
+                <div class="chart-header">
+                    <div class="timer-section">
+                        <div class="timer-ring" id="timerRing">
+                            <svg viewBox="0 0 100 100">
+                                <circle class="timer-bg" cx="50" cy="50" r="45"/>
+                                <circle class="timer-progress" id="timerProgress" cx="50" cy="50" r="45"/>
+                            </svg>
+                            <div class="timer-text" id="timerText">12</div>
+                        </div>
+                        <span class="timer-label">seconds</span>
+                    </div>
+                    <div class="controls">
+                        <button class="control-btn" id="prevBtn" title="Previous Slot">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="15,18 9,12 15,6"/>
+                            </svg>
+                        </button>
+                        <button class="control-btn play-btn" id="playPauseBtn" title="Play/Pause">
+                            <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor">
+                                <polygon points="5,3 19,12 5,21"/>
+                            </svg>
+                            <svg class="pause-icon" viewBox="0 0 24 24" fill="currentColor">
+                                <rect x="6" y="4" width="4" height="16"/>
+                                <rect x="14" y="4" width="4" height="16"/>
+                            </svg>
+                        </button>
+                        <button class="control-btn" id="nextBtn" title="Next Slot">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9,18 15,12 9,6"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="chart-wrapper">
+                    <div id="chart"></div>
+                </div>
+            </div>
+
+            <aside class="sidebar">
+                <div class="stats-card">
+                    <h3>Stats</h3>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Bids</span>
+                        <span class="stat-value" id="totalBids">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Max Bid</span>
+                        <span class="stat-value" id="maxBid">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Builders</span>
+                        <span class="stat-value" id="builderCount">--</span>
+                    </div>
+                </div>
+
+                <div class="legend-card">
+                    <h3>Builders</h3>
+                    <div class="legend-list" id="legendList">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+            </aside>
+        </main>
+
+        <div class="status-bar">
+            <div class="status-indicator" id="statusIndicator">
+                <span class="status-dot"></span>
+                <span class="status-text">Connecting...</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
