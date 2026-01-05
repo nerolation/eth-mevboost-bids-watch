@@ -301,6 +301,40 @@ body {
     margin-bottom: 1rem;
 }
 
+/* Relays (in chart header) */
+.relays-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    flex: 1;
+    justify-content: center;
+    align-items: center;
+    padding: 0 1rem;
+}
+
+.relay-tile {
+    display: inline-block;
+    padding: 0.1875rem 0.5rem;
+    font-size: 0.625rem;
+    font-weight: 500;
+    color: var(--accent-cyan);
+    background: rgba(56, 189, 248, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.2);
+    border-radius: 4px;
+    white-space: nowrap;
+    transition: all var(--transition-fast);
+}
+
+.relay-tile:hover {
+    background: rgba(56, 189, 248, 0.15);
+    border-color: rgba(56, 189, 248, 0.3);
+}
+
+.relay-empty {
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+}
+
 .stat-item {
     display: flex;
     justify-content: space-between;
@@ -395,11 +429,23 @@ body {
     gap: 0.5rem;
 }
 
-.powered-by {
+.footer-credits {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     font-size: 0.75rem;
     color: var(--text-muted);
 }
 
+.footer-sep {
+    opacity: 0.4;
+}
+
+.built-by .heart {
+    color: #ef4444;
+}
+
+.built-by a,
 .powered-by a {
     color: var(--accent-cyan);
     text-decoration: none;
@@ -407,6 +453,7 @@ body {
     transition: color var(--transition-fast);
 }
 
+.built-by a:hover,
 .powered-by a:hover {
     color: var(--accent-purple);
     text-decoration: underline;
@@ -505,6 +552,10 @@ body {
 
     .slot-number {
         font-size: 1.25rem;
+    }
+
+    .relays-list {
+        display: none;
     }
 }
 

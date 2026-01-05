@@ -14,6 +14,7 @@ class MEVDashboard {
         this.timerInterval = null;
         this.allBidsData = [];  // All bids for current slot
         this.bidsData = [];     // Currently visible bids (filtered by time)
+        this.relaysData = [];   // Relays that reported bids for current slot
         this.builderColors = new Map();
         this.chartInitialized = false;
 
@@ -36,6 +37,7 @@ class MEVDashboard {
             maxBid: document.getElementById('maxBid'),
             builderCount: document.getElementById('builderCount'),
             legendList: document.getElementById('legendList'),
+            relaysList: document.getElementById('relaysList'),
             statusIndicator: document.getElementById('statusIndicator'),
             statusText: document.querySelector('.status-text'),
             // Loading overlay elements
@@ -53,25 +55,25 @@ class MEVDashboard {
             plot_bgcolor: 'transparent',
             font: {
                 family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                color: '#a0a0b0'
+                color: '#94a3b8'
             },
             xaxis: {
                 title: {
                     text: 'Time in Slot (seconds)',
-                    font: { size: 12, color: '#a0a0b0' }
+                    font: { size: 12, color: '#94a3b8' }
                 },
                 range: [0, 4],  // Will be updated dynamically
-                gridcolor: 'rgba(255,255,255,0.05)',
-                zerolinecolor: 'rgba(255,255,255,0.1)',
+                gridcolor: 'rgba(148,163,184,0.08)',
+                zerolinecolor: 'rgba(148,163,184,0.15)',
                 tickfont: { size: 11 }
             },
             yaxis: {
                 title: {
                     text: 'Bid Value (ETH)',
-                    font: { size: 12, color: '#a0a0b0' }
+                    font: { size: 12, color: '#94a3b8' }
                 },
-                gridcolor: 'rgba(255,255,255,0.05)',
-                zerolinecolor: 'rgba(255,255,255,0.1)',
+                gridcolor: 'rgba(148,163,184,0.08)',
+                zerolinecolor: 'rgba(148,163,184,0.15)',
                 tickfont: { size: 11 },
                 tickformat: '.4f'
             },
@@ -138,8 +140,8 @@ class MEVDashboard {
         const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
         defs.innerHTML = `
             <linearGradient id="timerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" style="stop-color:#00d4ff"/>
-                <stop offset="100%" style="stop-color:#8b5cf6"/>
+                <stop offset="0%" style="stop-color:#38bdf8"/>
+                <stop offset="100%" style="stop-color:#818cf8"/>
             </linearGradient>
         `;
         svg.insertBefore(defs, svg.firstChild);
@@ -315,6 +317,7 @@ class MEVDashboard {
     displaySlotData(data) {
         // Store all bids and reset elapsed time
         this.allBidsData = data.bids || [];
+        this.relaysData = data.relays || [];
         this.elapsedTime = 0;
         this.elements.slotNumber.textContent = this.currentSlot.toLocaleString();
 
@@ -325,8 +328,26 @@ class MEVDashboard {
             }
         });
 
+        // Update relays display
+        this.updateRelays();
+
         // Filter bids visible at current elapsed time and update display
         this.updateVisibleBids();
+    }
+
+    updateRelays() {
+        if (!this.elements.relaysList) return;
+
+        if (this.relaysData.length === 0) {
+            this.elements.relaysList.innerHTML = '<span class="relay-empty">No relays</span>';
+            return;
+        }
+
+        this.elements.relaysList.innerHTML = this.relaysData.map(relay => {
+            // Clean up relay name for display (remove common prefixes/suffixes)
+            const displayName = relay.replace(/^relay-/, '').replace(/-relay$/, '');
+            return `<span class="relay-tile" title="${relay}">${displayName}</span>`;
+        }).join('');
     }
 
     updateVisibleBids() {

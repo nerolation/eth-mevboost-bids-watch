@@ -112,23 +112,23 @@ def load_builder_mapping() -> dict:
 # Load builder mapping at startup
 builder_dict = load_builder_mapping()
 
-# Define a curated color palette for builders
+# Define a curated color palette for builders (professional, muted tones)
 BUILDER_COLORS = [
-    "#00d4ff",  # Cyan
-    "#ff6b6b",  # Coral
-    "#4ecdc4",  # Teal
-    "#ffe66d",  # Yellow
-    "#95e1d3",  # Mint
-    "#f38181",  # Salmon
-    "#aa96da",  # Lavender
-    "#fcbad3",  # Pink
-    "#a8d8ea",  # Light blue
-    "#ffd93d",  # Gold
-    "#6bcb77",  # Green
-    "#ff8c42",  # Orange
-    "#b8f2e6",  # Aqua
-    "#e36bae",  # Magenta
-    "#aed6dc",  # Powder blue
+    "#38bdf8",  # Sky blue
+    "#f472b6",  # Pink
+    "#34d399",  # Emerald
+    "#fbbf24",  # Amber
+    "#a78bfa",  # Violet
+    "#fb7185",  # Rose
+    "#2dd4bf",  # Teal
+    "#f97316",  # Orange
+    "#818cf8",  # Indigo
+    "#4ade80",  # Green
+    "#f43f5e",  # Red
+    "#22d3ee",  # Cyan
+    "#c084fc",  # Purple
+    "#facc15",  # Yellow
+    "#94a3b8",  # Slate
 ]
 
 # Cache for builder colors
@@ -189,8 +189,21 @@ def fetch_slot_data(slot_number: int) -> dict:
 
     df = xatu.execute_query(query, columns="slot, builder_pubkey, block_hash, timestamp_ms, value")
 
+    # Query distinct relays for this slot
+    relay_query = f"""
+        SELECT DISTINCT relay_name
+        FROM mev_relay_bid_trace
+        WHERE meta_network_name = 'mainnet'
+        AND slot_start_date_time >= '{slot_date}'
+        AND slot_start_date_time < '{slot_date}'::date + INTERVAL 1 DAY
+        AND slot = {slot_number}
+        ORDER BY relay_name
+    """
+    relay_df = xatu.execute_query(relay_query, columns="relay_name")
+    relays = relay_df["relay_name"].tolist() if not relay_df.empty else []
+
     if df.empty:
-        return {"slot": slot_number, "bids": [], "cached": False}
+        return {"slot": slot_number, "bids": [], "relays": relays, "cached": False}
 
     bids = []
     for _, row in df.iterrows():
@@ -211,7 +224,7 @@ def fetch_slot_data(slot_number: int) -> dict:
             "color": get_builder_color(builder_pubkey)
         })
 
-    return {"slot": slot_number, "bids": bids, "cached": False}
+    return {"slot": slot_number, "bids": bids, "relays": relays, "cached": False}
 
 
 def prefetch_slot_background(slot_number: int):
