@@ -75,8 +75,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize PyXatu connection
-xatu = pyxatu.PyXatu()
+# Initialize PyXatu connection (reads URL from environment variable)
+xatu = pyxatu.PyXatu(use_env_variables=True)
 
 # Genesis timestamp and slot duration for Ethereum mainnet
 GENESIS_TS = 1606824023000  # milliseconds
