@@ -37,8 +37,15 @@ class MEVDashboard {
             builderCount: document.getElementById('builderCount'),
             legendList: document.getElementById('legendList'),
             statusIndicator: document.getElementById('statusIndicator'),
-            statusText: document.querySelector('.status-text')
+            statusText: document.querySelector('.status-text'),
+            // Loading overlay elements
+            loadingOverlay: document.getElementById('loadingOverlay'),
+            loadingStatus: document.getElementById('loadingStatus'),
+            loadingProgressBar: document.getElementById('loadingProgressBar')
         };
+
+        // Track initial load state
+        this.initialLoadComplete = false;
 
         // Plotly chart configuration
         this.chartLayout = {
@@ -87,6 +94,24 @@ class MEVDashboard {
         this.setupTimerSVG();
         await this.fetchLatestSlot();
         this.startTimer();
+    }
+
+    // --- Loading Overlay Methods ---
+
+    updateLoadingStatus(message, progress = null) {
+        if (this.elements.loadingStatus) {
+            this.elements.loadingStatus.textContent = message;
+        }
+        if (progress !== null && this.elements.loadingProgressBar) {
+            this.elements.loadingProgressBar.style.width = `${progress}%`;
+        }
+    }
+
+    hideLoadingOverlay() {
+        if (this.elements.loadingOverlay && !this.initialLoadComplete) {
+            this.initialLoadComplete = true;
+            this.elements.loadingOverlay.classList.add('hidden');
+        }
     }
 
     setupEventListeners() {
@@ -199,19 +224,34 @@ class MEVDashboard {
 
     async fetchLatestSlot() {
         try {
+            this.updateLoadingStatus('Connecting to Xatu...', 10);
+
             const response = await fetch('/api/latest-slot');
             const data = await response.json();
             this.latestSlot = data.slot;
             this.headOffset = data.head_offset || 100;
             this.maxAvailableSlot = data.slot;  // This is already offset from head
             this.currentSlot = this.latestSlot;
+
+            this.updateLoadingStatus(`Loading slot ${this.currentSlot}...`, 40);
             this.updateStatus('connected', `Connected - Slot ${this.currentSlot}`);
+
             await this.loadSlotData();
+
+            this.updateLoadingStatus('Ready!', 100);
+
+            // Hide overlay after a brief moment to show "Ready!"
+            setTimeout(() => this.hideLoadingOverlay(), 300);
+
             // Start prefetching immediately
             this.prefetchSlots(this.currentSlot);
         } catch (error) {
             console.error('Failed to fetch latest slot:', error);
+            this.updateLoadingStatus('Connection failed. Retrying...', 0);
             this.updateStatus('error', 'Connection failed');
+
+            // Retry after 3 seconds
+            setTimeout(() => this.fetchLatestSlot(), 3000);
         }
     }
 
@@ -246,7 +286,16 @@ class MEVDashboard {
         try {
             this.updateStatus('connected', `Loading slot ${this.currentSlot}...`);
 
+            // Update loading overlay progress during initial load
+            if (!this.initialLoadComplete) {
+                this.updateLoadingStatus(`Fetching bids for slot ${this.currentSlot}...`, 60);
+            }
+
             const data = await this.fetchSlotData(this.currentSlot);
+
+            if (!this.initialLoadComplete) {
+                this.updateLoadingStatus('Processing data...', 85);
+            }
 
             if (data) {
                 this.displaySlotData(data);

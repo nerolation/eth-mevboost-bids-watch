@@ -1,5 +1,6 @@
 import os
 import asyncio
+from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -89,6 +90,13 @@ def seconds_in_slot(slot: int, timestamp_ms: int) -> float:
     return (timestamp_ms - slot_start) / 1000.0  # Convert to seconds
 
 
+def slot_to_date(slot: int) -> str:
+    """Convert slot number to date string (YYYY-MM-DD) for partition filtering."""
+    slot_start_ms = GENESIS_TS + slot * SLOT_DURATION
+    dt = datetime.fromtimestamp(slot_start_ms / 1000, tz=timezone.utc)
+    return dt.strftime("%Y-%m-%d")
+
+
 def load_builder_mapping() -> dict:
     """Load builder pubkey to name mapping from CSV."""
     csv_path = os.path.join(os.path.dirname(__file__), "builder_mapping.csv")
@@ -142,10 +150,13 @@ HEAD_OFFSET = 100
 async def get_latest_slot():
     """Get the latest available slot number."""
     try:
-        result = xatu.execute_query("""
+        # Use partition filter on slot_start_date_time for efficiency
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        result = xatu.execute_query(f"""
             SELECT max(slot) as slot
             FROM mev_relay_bid_trace
             WHERE meta_network_name = 'mainnet'
+            AND slot_start_date_time >= '{today}'
         """, columns="slot")
 
         latest_slot = int(result["slot"][0]) - HEAD_OFFSET
@@ -158,6 +169,8 @@ def fetch_slot_data(slot_number: int) -> dict:
     """Fetch slot data from Xatu (blocking call)."""
     # Use block_hash to ensure unique bids (same bid can be reported by multiple relays)
     # Group by block_hash and take the min timestamp for each unique bid
+    # Include partition filter on slot_start_date_time for efficiency
+    slot_date = slot_to_date(slot_number)
     query = f"""
         SELECT
             slot,
@@ -167,6 +180,8 @@ def fetch_slot_data(slot_number: int) -> dict:
             value
         FROM mev_relay_bid_trace
         WHERE meta_network_name = 'mainnet'
+        AND slot_start_date_time >= '{slot_date}'
+        AND slot_start_date_time < '{slot_date}'::date + INTERVAL 1 DAY
         AND slot = {slot_number}
         GROUP BY slot, builder_pubkey, block_hash, value
         ORDER BY timestamp_ms ASC
