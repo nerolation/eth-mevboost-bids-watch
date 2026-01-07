@@ -38,6 +38,10 @@ class MEVDashboard {
             builderCount: document.getElementById('builderCount'),
             legendList: document.getElementById('legendList'),
             relaysList: document.getElementById('relaysList'),
+            winningBuilder: document.getElementById('winningBuilder'),
+            winningColor: document.getElementById('winningColor'),
+            winningName: document.getElementById('winningName'),
+            winningValue: document.getElementById('winningValue'),
             statusIndicator: document.getElementById('statusIndicator'),
             statusText: document.querySelector('.status-text'),
             // Loading overlay elements
@@ -357,6 +361,31 @@ class MEVDashboard {
         this.updateChart();
         this.updateStats();
         this.updateLegend();
+        this.updateWinningBuilder();
+    }
+
+    updateWinningBuilder() {
+        if (this.bidsData.length === 0) {
+            this.elements.winningBuilder.classList.remove('has-winner');
+            this.elements.winningColor.style.backgroundColor = '';
+            this.elements.winningColor.style.color = '';
+            this.elements.winningColor.classList.remove('active');
+            this.elements.winningName.textContent = '--';
+            this.elements.winningValue.textContent = '';
+            return;
+        }
+
+        // Find the highest bid among visible bids
+        const winningBid = this.bidsData.reduce((max, bid) =>
+            bid.value_eth > max.value_eth ? bid : max
+        );
+
+        this.elements.winningBuilder.classList.add('has-winner');
+        this.elements.winningColor.style.backgroundColor = winningBid.color;
+        this.elements.winningColor.style.color = winningBid.color;
+        this.elements.winningColor.classList.add('active');
+        this.elements.winningName.textContent = winningBid.builder_label;
+        this.elements.winningValue.textContent = `${winningBid.value_eth.toFixed(4)} ETH`;
     }
 
     updateChart() {
