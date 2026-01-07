@@ -483,17 +483,18 @@ class MEVDashboard {
     }
 
     updateLegend() {
-        // Count bids per builder (group by label)
+        // Count bids per builder (group by pubkey for color consistency)
         const builderCounts = new Map();
         this.bidsData.forEach(bid => {
-            const label = bid.builder_label;
-            if (!builderCounts.has(label)) {
-                builderCounts.set(label, {
+            const pubkey = bid.builder_pubkey;
+            if (!builderCounts.has(pubkey)) {
+                builderCounts.set(pubkey, {
+                    label: bid.builder_label,
                     color: bid.color,
                     count: 0
                 });
             }
-            builderCounts.get(label).count++;
+            builderCounts.get(pubkey).count++;
         });
 
         // Sort by count descending
@@ -501,10 +502,10 @@ class MEVDashboard {
             .sort((a, b) => b[1].count - a[1].count);
 
         // Generate legend HTML
-        this.elements.legendList.innerHTML = sorted.map(([label, data]) => `
+        this.elements.legendList.innerHTML = sorted.map(([pubkey, data]) => `
             <div class="legend-item">
                 <div class="legend-color" style="background-color: ${data.color}; color: ${data.color}"></div>
-                <span class="legend-name" title="${label}">${label}</span>
+                <span class="legend-name" title="${data.label}">${data.label}</span>
                 <span class="legend-count">${data.count}</span>
             </div>
         `).join('');
