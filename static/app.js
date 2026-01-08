@@ -19,6 +19,9 @@ class MEVDashboard {
         this.MAX_BUILDER_COLORS = 200;  // Limit to prevent memory growth
         this.chartInitialized = false;
 
+        // Display offset: show bids from -4s to 8s (instead of 0s to 12s)
+        this.DISPLAY_OFFSET = 4;
+
         // Cache for slot data
         this.slotCache = new Map();
         this.pendingFetches = new Set();
@@ -68,7 +71,7 @@ class MEVDashboard {
                     text: 'Time in Slot (seconds)',
                     font: { size: 12, color: '#94a3b8' }
                 },
-                range: [0, 4],  // Will be updated dynamically
+                range: [-4, 8],  // Will be updated dynamically
                 gridcolor: 'rgba(148,163,184,0.08)',
                 zerolinecolor: 'rgba(148,163,184,0.15)',
                 tickfont: { size: 11 }
@@ -363,8 +366,10 @@ class MEVDashboard {
     }
 
     updateVisibleBids() {
-        // Show only bids that would have arrived by the current elapsed time
-        this.bidsData = this.allBidsData.filter(bid => bid.seconds_in_slot <= this.elapsedTime);
+        // Show bids that would have arrived by the current display time
+        // Display time is offset by DISPLAY_OFFSET to show early bids (negative seconds_in_slot)
+        const displayTime = this.elapsedTime - this.DISPLAY_OFFSET;
+        this.bidsData = this.allBidsData.filter(bid => bid.seconds_in_slot <= displayTime);
 
         this.updateChart();
         this.updateStats();
@@ -417,7 +422,9 @@ class MEVDashboard {
     updateChart() {
         // Calculate dynamic x-axis range based on ALL bids (not just visible)
         // This prevents the axis from jumping as bids appear
-        let maxX = 4;  // Default minimum
+        // X-axis starts at -DISPLAY_OFFSET to show early bids
+        const minX = -this.DISPLAY_OFFSET;
+        let maxX = 8;  // Default max (12 - DISPLAY_OFFSET)
         if (this.allBidsData.length > 0) {
             const maxDataX = Math.max(...this.allBidsData.map(b => b.seconds_in_slot));
             maxX = Math.max(maxX, maxDataX * 1.1);  // Add 10% padding
@@ -428,8 +435,67 @@ class MEVDashboard {
             ...this.chartLayout,
             xaxis: {
                 ...this.chartLayout.xaxis,
-                range: [0, maxX]
-            }
+                range: [minX, maxX]
+            },
+            // Only show reference lines when there are bids
+            shapes: this.allBidsData.length > 0 ? [
+                {
+                    type: 'line',
+                    x0: 0,
+                    x1: 0,
+                    y0: 0,
+                    y1: 1,
+                    yref: 'paper',
+                    line: {
+                        color: 'rgba(148, 163, 184, 0.5)',
+                        width: 1.5,
+                        dash: 'dash'
+                    }
+                },
+                {
+                    type: 'line',
+                    x0: 4,
+                    x1: 4,
+                    y0: 0,
+                    y1: 1,
+                    yref: 'paper',
+                    line: {
+                        color: 'rgba(148, 163, 184, 0.5)',
+                        width: 1.5,
+                        dash: 'dash'
+                    }
+                }
+            ] : [],
+            annotations: this.allBidsData.length > 0 ? [
+                {
+                    x: 0,
+                    y: 1,
+                    yref: 'paper',
+                    text: 'Slot Begin',
+                    showarrow: false,
+                    font: {
+                        size: 10,
+                        color: 'rgba(148, 163, 184, 0.7)'
+                    },
+                    yanchor: 'bottom',
+                    xanchor: 'left',
+                    xshift: 4
+                },
+                {
+                    x: 4,
+                    y: 1,
+                    yref: 'paper',
+                    text: 'Attestation Deadline',
+                    showarrow: false,
+                    font: {
+                        size: 10,
+                        color: 'rgba(148, 163, 184, 0.7)'
+                    },
+                    yanchor: 'bottom',
+                    xanchor: 'left',
+                    xshift: 4
+                }
+            ] : []
         };
 
         if (this.bidsData.length === 0) {
