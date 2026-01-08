@@ -16,6 +16,7 @@ class MEVDashboard {
         this.bidsData = [];     // Currently visible bids (filtered by time)
         this.relaysData = [];   // Relays that reported bids for current slot
         this.builderColors = new Map();
+        this.MAX_BUILDER_COLORS = 200;  // Limit to prevent memory growth
         this.chartInitialized = false;
 
         // Cache for slot data
@@ -327,9 +328,14 @@ class MEVDashboard {
         this.elapsedTime = 0;
         this.elements.slotNumber.textContent = this.currentSlot.toLocaleString();
 
-        // Update colors map
+        // Update colors map (with LRU eviction to prevent memory growth)
         this.allBidsData.forEach(bid => {
             if (!this.builderColors.has(bid.builder_pubkey)) {
+                // Evict oldest entries if at capacity
+                if (this.builderColors.size >= this.MAX_BUILDER_COLORS) {
+                    const firstKey = this.builderColors.keys().next().value;
+                    this.builderColors.delete(firstKey);
+                }
                 this.builderColors.set(bid.builder_pubkey, bid.color);
             }
         });

@@ -131,8 +131,9 @@ BUILDER_COLORS = [
     "#94a3b8",  # Slate
 ]
 
-# Cache for builder colors
-builder_color_cache: dict = {}
+# Cache for builder colors (bounded to prevent memory growth)
+builder_color_cache: OrderedDict = OrderedDict()
+MAX_BUILDER_COLOR_CACHE = 500
 
 
 def get_builder_color(builder_pubkey: str) -> str:
@@ -140,6 +141,12 @@ def get_builder_color(builder_pubkey: str) -> str:
     if builder_pubkey not in builder_color_cache:
         idx = len(builder_color_cache) % len(BUILDER_COLORS)
         builder_color_cache[builder_pubkey] = BUILDER_COLORS[idx]
+        # Evict oldest entries if cache is too large
+        while len(builder_color_cache) > MAX_BUILDER_COLOR_CACHE:
+            builder_color_cache.popitem(last=False)
+    else:
+        # Move to end (LRU)
+        builder_color_cache.move_to_end(builder_pubkey)
     return builder_color_cache[builder_pubkey]
 
 
