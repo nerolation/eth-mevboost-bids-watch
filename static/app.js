@@ -328,6 +328,7 @@ class MEVDashboard {
         this.allBidsData = data.bids || [];
         this.relaysData = data.relays || [];
         this.winningBlockHash = data.winning_block_hash || null;
+        this.blockSeenInSlot = data.block_seen_in_slot || null;
         this.elapsedTime = 0;
         this.elements.slotNumber.textContent = this.currentSlot.toLocaleString();
 
@@ -464,7 +465,21 @@ class MEVDashboard {
                         width: 1.5,
                         dash: 'dash'
                     }
-                }
+                },
+                // Block seen line (only if data exists and elapsed time has reached it)
+                ...(this.blockSeenInSlot !== null && this.elapsedTime >= this.blockSeenInSlot + this.DISPLAY_OFFSET ? [{
+                    type: 'line',
+                    x0: this.blockSeenInSlot,
+                    x1: this.blockSeenInSlot,
+                    y0: 0,
+                    y1: 1,
+                    yref: 'paper',
+                    line: {
+                        color: 'rgba(56, 189, 248, 0.6)',
+                        width: 1.5,
+                        dash: 'dash'
+                    }
+                }] : [])
             ] : [],
             annotations: this.allBidsData.length > 0 ? [
                 {
@@ -494,7 +509,22 @@ class MEVDashboard {
                     yanchor: 'bottom',
                     xanchor: 'left',
                     xshift: 4
-                }
+                },
+                // Block seen annotation (only if data exists and elapsed time has reached it)
+                ...(this.blockSeenInSlot !== null && this.elapsedTime >= this.blockSeenInSlot + this.DISPLAY_OFFSET ? [{
+                    x: this.blockSeenInSlot,
+                    y: 1,
+                    yref: 'paper',
+                    text: 'Block Seen',
+                    showarrow: false,
+                    font: {
+                        size: 10,
+                        color: 'rgba(56, 189, 248, 0.8)'
+                    },
+                    yanchor: 'bottom',
+                    xanchor: 'left',
+                    xshift: 4
+                }] : [])
             ] : []
         };
 

@@ -222,8 +222,26 @@ def fetch_slot_data(slot_number: int) -> dict:
     winning_df = xatu.execute_query(winning_query, columns="block_hash")
     winning_block_hash = winning_df["block_hash"].iloc[0] if not winning_df.empty else None
 
+    # Query when block was first seen in P2P network
+    block_seen_in_slot = None
+    try:
+        block_seen_query = f"""
+            SELECT toUnixTimestamp64Milli(min(event_date_time)) as block_seen_ms
+            FROM beacon_api_eth_v1_events_block
+            WHERE meta_network_name = 'mainnet'
+            AND slot_start_date_time >= '{slot_date}'
+            AND slot_start_date_time < '{slot_date}'::date + INTERVAL 1 DAY
+            AND slot = {slot_number}
+        """
+        block_seen_df = xatu.execute_query(block_seen_query, columns="block_seen_ms")
+        if not block_seen_df.empty and pd.notna(block_seen_df["block_seen_ms"].iloc[0]):
+            block_seen_ms = int(block_seen_df["block_seen_ms"].iloc[0])
+            block_seen_in_slot = seconds_in_slot(slot_number, block_seen_ms)
+    except Exception:
+        pass  # Block seen data is optional, don't fail if unavailable
+
     if df.empty:
-        return {"slot": slot_number, "bids": [], "relays": relays, "winning_block_hash": winning_block_hash, "cached": False}
+        return {"slot": slot_number, "bids": [], "relays": relays, "winning_block_hash": winning_block_hash, "block_seen_in_slot": block_seen_in_slot, "cached": False}
 
     bids = []
     for _, row in df.iterrows():
@@ -248,7 +266,7 @@ def fetch_slot_data(slot_number: int) -> dict:
             "is_winner": is_winner
         })
 
-    return {"slot": slot_number, "bids": bids, "relays": relays, "winning_block_hash": winning_block_hash, "cached": False}
+    return {"slot": slot_number, "bids": bids, "relays": relays, "winning_block_hash": winning_block_hash, "block_seen_in_slot": block_seen_in_slot, "cached": False}
 
 
 def prefetch_slot_background(slot_number: int):
