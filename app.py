@@ -65,7 +65,7 @@ class SlotCache:
         with self.lock:
             self.pending.discard(slot)
 
-slot_cache = SlotCache()
+slot_cache = SlotCache(max_size=20, ttl_seconds=120)  # Optimized for typical usage (10-20 slots)
 
 # Enable CORS for development
 app.add_middleware(
@@ -133,7 +133,7 @@ BUILDER_COLORS = [
 
 # Cache for builder colors (bounded to prevent memory growth)
 builder_color_cache: OrderedDict = OrderedDict()
-MAX_BUILDER_COLOR_CACHE = 500
+MAX_BUILDER_COLOR_CACHE = 100
 
 
 def get_builder_color(builder_pubkey: str) -> str:
