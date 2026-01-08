@@ -162,8 +162,8 @@ class MEVDashboard {
 
     setCachedSlot(slot, data) {
         this.slotCache.set(slot, data);
-        // Keep cache size reasonable (last 50 slots)
-        if (this.slotCache.size > 50) {
+        // Keep cache size reasonable (last 20 slots)
+        if (this.slotCache.size > 20) {
             const oldest = this.slotCache.keys().next().value;
             this.slotCache.delete(oldest);
         }
