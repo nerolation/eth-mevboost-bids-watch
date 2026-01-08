@@ -328,6 +328,7 @@ class MEVDashboard {
         this.allBidsData = data.bids || [];
         this.relaysData = data.relays || [];
         this.winningBlockHash = data.winning_block_hash || null;
+        this.winningBuilderLabel = data.winning_builder_label || null;
         this.blockSeenInSlot = data.block_seen_in_slot || null;
         this.elapsedTime = 0;
         this.elements.slotNumber.textContent = this.currentSlot.toLocaleString();
@@ -410,13 +411,27 @@ class MEVDashboard {
             this.elements.winningName.textContent = `★ ${deliveredBid.builder_label}`;
             this.elements.winningValue.textContent = `${deliveredBid.value_eth.toFixed(4)} ETH`;
         } else {
-            this.elements.winningBuilder.classList.remove('is-delivered');
-            this.elements.winningLabel.textContent = 'Leading';
-            this.elements.winningColor.style.backgroundColor = leadingBid.color;
-            this.elements.winningColor.style.color = leadingBid.color;
-            this.elements.winningColor.classList.add('active');
-            this.elements.winningName.textContent = leadingBid.builder_label;
-            this.elements.winningValue.textContent = `${leadingBid.value_eth.toFixed(4)} ETH`;
+            // After block seen, if winning builder is known but bid not in list, show delivered winner
+            const displayTime = this.elapsedTime - this.DISPLAY_OFFSET;
+            const blockSeen = this.blockSeenInSlot !== null && displayTime >= this.blockSeenInSlot;
+
+            if (blockSeen && this.winningBuilderLabel) {
+                this.elements.winningBuilder.classList.add('is-delivered');
+                this.elements.winningLabel.textContent = 'Delivered';
+                this.elements.winningColor.style.backgroundColor = '#fbbf24';
+                this.elements.winningColor.style.color = '#fbbf24';
+                this.elements.winningColor.classList.add('active');
+                this.elements.winningName.textContent = `★ ${this.winningBuilderLabel}`;
+                this.elements.winningValue.textContent = '';
+            } else {
+                this.elements.winningBuilder.classList.remove('is-delivered');
+                this.elements.winningLabel.textContent = 'Leading';
+                this.elements.winningColor.style.backgroundColor = leadingBid.color;
+                this.elements.winningColor.style.color = leadingBid.color;
+                this.elements.winningColor.classList.add('active');
+                this.elements.winningName.textContent = leadingBid.builder_label;
+                this.elements.winningValue.textContent = `${leadingBid.value_eth.toFixed(4)} ETH`;
+            }
         }
     }
 

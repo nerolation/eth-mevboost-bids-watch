@@ -209,9 +209,9 @@ def fetch_slot_data(slot_number: int) -> dict:
     relay_df = xatu.execute_query(relay_query, columns="relay_name")
     relays = relay_df["relay_name"].tolist() if not relay_df.empty else []
 
-    # Query the winning (delivered) block_hash from proposer payload delivered table
+    # Query the winning (delivered) block_hash and builder from proposer payload delivered table
     winning_query = f"""
-        SELECT block_hash
+        SELECT block_hash, builder_pubkey
         FROM mev_relay_proposer_payload_delivered
         WHERE meta_network_name = 'mainnet'
         AND slot_start_date_time >= '{slot_date}'
@@ -219,8 +219,10 @@ def fetch_slot_data(slot_number: int) -> dict:
         AND slot = {slot_number}
         LIMIT 1
     """
-    winning_df = xatu.execute_query(winning_query, columns="block_hash")
+    winning_df = xatu.execute_query(winning_query, columns="block_hash, builder_pubkey")
     winning_block_hash = winning_df["block_hash"].iloc[0] if not winning_df.empty else None
+    winning_builder_pubkey = winning_df["builder_pubkey"].iloc[0] if not winning_df.empty else None
+    winning_builder_label = builder_dict.get(winning_builder_pubkey, winning_builder_pubkey[:10] + "...") if winning_builder_pubkey else None
 
     # Query when block was first seen in P2P network
     block_seen_in_slot = None
@@ -241,7 +243,7 @@ def fetch_slot_data(slot_number: int) -> dict:
         pass  # Block seen data is optional, don't fail if unavailable
 
     if df.empty:
-        return {"slot": slot_number, "bids": [], "relays": relays, "winning_block_hash": winning_block_hash, "block_seen_in_slot": block_seen_in_slot, "cached": False}
+        return {"slot": slot_number, "bids": [], "relays": relays, "winning_block_hash": winning_block_hash, "winning_builder_label": winning_builder_label, "block_seen_in_slot": block_seen_in_slot, "cached": False}
 
     bids = []
     for _, row in df.iterrows():
@@ -266,7 +268,7 @@ def fetch_slot_data(slot_number: int) -> dict:
             "is_winner": is_winner
         })
 
-    return {"slot": slot_number, "bids": bids, "relays": relays, "winning_block_hash": winning_block_hash, "block_seen_in_slot": block_seen_in_slot, "cached": False}
+    return {"slot": slot_number, "bids": bids, "relays": relays, "winning_block_hash": winning_block_hash, "winning_builder_label": winning_builder_label, "block_seen_in_slot": block_seen_in_slot, "cached": False}
 
 
 def prefetch_slot_background(slot_number: int):
