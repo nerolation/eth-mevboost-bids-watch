@@ -39,6 +39,7 @@ class MEVDashboard {
             legendList: document.getElementById('legendList'),
             relaysList: document.getElementById('relaysList'),
             winningBuilder: document.getElementById('winningBuilder'),
+            winningLabel: document.querySelector('.winning-label'),
             winningColor: document.getElementById('winningColor'),
             winningName: document.getElementById('winningName'),
             winningValue: document.getElementById('winningValue'),
@@ -322,6 +323,7 @@ class MEVDashboard {
         // Store all bids and reset elapsed time
         this.allBidsData = data.bids || [];
         this.relaysData = data.relays || [];
+        this.winningBlockHash = data.winning_block_hash || null;
         this.elapsedTime = 0;
         this.elements.slotNumber.textContent = this.currentSlot.toLocaleString();
 
@@ -365,8 +367,12 @@ class MEVDashboard {
     }
 
     updateWinningBuilder() {
+        // Check if the delivered bid is visible
+        const deliveredBid = this.bidsData.find(bid => bid.is_winner);
+
         if (this.bidsData.length === 0) {
-            this.elements.winningBuilder.classList.remove('has-winner');
+            this.elements.winningBuilder.classList.remove('has-winner', 'is-delivered');
+            this.elements.winningLabel.textContent = 'Leading';
             this.elements.winningColor.style.backgroundColor = '';
             this.elements.winningColor.style.color = '';
             this.elements.winningColor.classList.remove('active');
@@ -376,16 +382,30 @@ class MEVDashboard {
         }
 
         // Find the highest bid among visible bids
-        const winningBid = this.bidsData.reduce((max, bid) =>
+        const leadingBid = this.bidsData.reduce((max, bid) =>
             bid.value_eth > max.value_eth ? bid : max
         );
 
         this.elements.winningBuilder.classList.add('has-winner');
-        this.elements.winningColor.style.backgroundColor = winningBid.color;
-        this.elements.winningColor.style.color = winningBid.color;
-        this.elements.winningColor.classList.add('active');
-        this.elements.winningName.textContent = winningBid.builder_label;
-        this.elements.winningValue.textContent = `${winningBid.value_eth.toFixed(4)} ETH`;
+
+        // If the delivered bid is visible, show it with special styling
+        if (deliveredBid) {
+            this.elements.winningBuilder.classList.add('is-delivered');
+            this.elements.winningLabel.textContent = 'Delivered';
+            this.elements.winningColor.style.backgroundColor = '#fbbf24';  // Gold color
+            this.elements.winningColor.style.color = '#fbbf24';
+            this.elements.winningColor.classList.add('active');
+            this.elements.winningName.textContent = `★ ${deliveredBid.builder_label}`;
+            this.elements.winningValue.textContent = `${deliveredBid.value_eth.toFixed(4)} ETH`;
+        } else {
+            this.elements.winningBuilder.classList.remove('is-delivered');
+            this.elements.winningLabel.textContent = 'Leading';
+            this.elements.winningColor.style.backgroundColor = leadingBid.color;
+            this.elements.winningColor.style.color = leadingBid.color;
+            this.elements.winningColor.classList.add('active');
+            this.elements.winningName.textContent = leadingBid.builder_label;
+            this.elements.winningValue.textContent = `${leadingBid.value_eth.toFixed(4)} ETH`;
+        }
     }
 
     updateChart() {
@@ -424,9 +444,13 @@ class MEVDashboard {
             return;
         }
 
-        // Group bids by builder
+        // Separate winning bid from regular bids
+        const regularBids = this.bidsData.filter(bid => !bid.is_winner);
+        const winningBid = this.bidsData.find(bid => bid.is_winner);
+
+        // Group regular bids by builder
         const builderGroups = new Map();
-        this.bidsData.forEach(bid => {
+        regularBids.forEach(bid => {
             if (!builderGroups.has(bid.builder_pubkey)) {
                 builderGroups.set(bid.builder_pubkey, {
                     x: [],
@@ -440,7 +464,7 @@ class MEVDashboard {
             group.y.push(bid.value_eth);
         });
 
-        // Create traces for each builder
+        // Create traces for each builder (regular bids)
         const traces = Array.from(builderGroups.entries()).map(([pubkey, data]) => ({
             x: data.x,
             y: data.y,
@@ -461,6 +485,32 @@ class MEVDashboard {
                            `Value: %{y:.6f} ETH<br>` +
                            `<extra></extra>`
         }));
+
+        // Add winning bid as a special trace with star marker
+        if (winningBid) {
+            traces.push({
+                x: [winningBid.seconds_in_slot],
+                y: [winningBid.value_eth],
+                mode: 'markers',
+                type: 'scatter',
+                name: `${winningBid.builder_label} (Delivered)`,
+                marker: {
+                    symbol: 'star',
+                    color: '#fbbf24',  // Gold/amber color
+                    size: 18,
+                    opacity: 1,
+                    line: {
+                        color: '#ffffff',
+                        width: 2
+                    }
+                },
+                hovertemplate: `<b>⭐ DELIVERED BID</b><br>` +
+                               `<b>${winningBid.builder_label}</b><br>` +
+                               `Time: %{x:.2f}s<br>` +
+                               `Value: %{y:.6f} ETH<br>` +
+                               `<extra></extra>`
+            });
+        }
 
         if (!this.chartInitialized) {
             Plotly.newPlot(this.elements.chart, traces, layout, this.chartConfig);
@@ -485,30 +535,45 @@ class MEVDashboard {
     updateLegend() {
         // Count bids per builder (group by pubkey for color consistency)
         const builderCounts = new Map();
+        let deliveredPubkey = null;
+
         this.bidsData.forEach(bid => {
             const pubkey = bid.builder_pubkey;
             if (!builderCounts.has(pubkey)) {
                 builderCounts.set(pubkey, {
                     label: bid.builder_label,
                     color: bid.color,
-                    count: 0
+                    count: 0,
+                    isDelivered: false
                 });
             }
             builderCounts.get(pubkey).count++;
+            if (bid.is_winner) {
+                builderCounts.get(pubkey).isDelivered = true;
+                deliveredPubkey = pubkey;
+            }
         });
 
-        // Sort by count descending
+        // Sort by count descending, but put delivered builder first
         const sorted = Array.from(builderCounts.entries())
-            .sort((a, b) => b[1].count - a[1].count);
+            .sort((a, b) => {
+                if (a[1].isDelivered) return -1;
+                if (b[1].isDelivered) return 1;
+                return b[1].count - a[1].count;
+            });
 
         // Generate legend HTML
-        this.elements.legendList.innerHTML = sorted.map(([pubkey, data]) => `
-            <div class="legend-item">
-                <div class="legend-color" style="background-color: ${data.color}; color: ${data.color}"></div>
-                <span class="legend-name" title="${data.label}">${data.label}</span>
-                <span class="legend-count">${data.count}</span>
-            </div>
-        `).join('');
+        this.elements.legendList.innerHTML = sorted.map(([pubkey, data]) => {
+            const deliveredClass = data.isDelivered ? 'is-delivered' : '';
+            const starIndicator = data.isDelivered ? '<span class="delivered-star">★</span>' : '';
+            return `
+                <div class="legend-item ${deliveredClass}">
+                    <div class="legend-color" style="background-color: ${data.isDelivered ? '#fbbf24' : data.color}; color: ${data.isDelivered ? '#fbbf24' : data.color}"></div>
+                    <span class="legend-name" title="${data.label}">${starIndicator}${data.label}</span>
+                    <span class="legend-count">${data.count}</span>
+                </div>
+            `;
+        }).join('');
     }
 
     updateStatus(status, text) {

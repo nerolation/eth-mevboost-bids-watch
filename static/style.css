@@ -221,6 +221,16 @@ body {
     background: rgba(56, 189, 248, 0.08);
 }
 
+.winning-builder.is-delivered {
+    border-color: rgba(251, 191, 36, 0.5);
+    background: rgba(251, 191, 36, 0.12);
+    box-shadow: 0 0 12px rgba(251, 191, 36, 0.2);
+}
+
+.winning-builder.is-delivered .winning-value {
+    color: #fbbf24;
+}
+
 .winning-label {
     font-size: 0.625rem;
     font-weight: 600;
@@ -466,6 +476,21 @@ body {
     padding: 0.125rem 0.375rem;
     background: var(--bg-secondary);
     border-radius: 4px;
+}
+
+.legend-item.is-delivered {
+    background: rgba(251, 191, 36, 0.1);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.legend-item.is-delivered .legend-color {
+    box-shadow: 0 0 10px #fbbf24;
+}
+
+.delivered-star {
+    color: #fbbf24;
+    margin-right: 0.25rem;
+    font-size: 0.875rem;
 }
 
 /* Status Bar */

@@ -202,8 +202,21 @@ def fetch_slot_data(slot_number: int) -> dict:
     relay_df = xatu.execute_query(relay_query, columns="relay_name")
     relays = relay_df["relay_name"].tolist() if not relay_df.empty else []
 
+    # Query the winning (delivered) block_hash from proposer payload delivered table
+    winning_query = f"""
+        SELECT block_hash
+        FROM mev_relay_proposer_payload_delivered
+        WHERE meta_network_name = 'mainnet'
+        AND slot_start_date_time >= '{slot_date}'
+        AND slot_start_date_time < '{slot_date}'::date + INTERVAL 1 DAY
+        AND slot = {slot_number}
+        LIMIT 1
+    """
+    winning_df = xatu.execute_query(winning_query, columns="block_hash")
+    winning_block_hash = winning_df["block_hash"].iloc[0] if not winning_df.empty else None
+
     if df.empty:
-        return {"slot": slot_number, "bids": [], "relays": relays, "cached": False}
+        return {"slot": slot_number, "bids": [], "relays": relays, "winning_block_hash": winning_block_hash, "cached": False}
 
     bids = []
     for _, row in df.iterrows():
@@ -214,6 +227,9 @@ def fetch_slot_data(slot_number: int) -> dict:
         value_wei = int(row["value"])
         value_eth = value_wei / 1e18
 
+        # Check if this bid is the winning (delivered) bid
+        is_winner = winning_block_hash is not None and row["block_hash"] == winning_block_hash
+
         bids.append({
             "timestamp_ms": int(row["timestamp_ms"]),
             "seconds_in_slot": seconds_in_slot(slot_number, int(row["timestamp_ms"])),
@@ -221,10 +237,11 @@ def fetch_slot_data(slot_number: int) -> dict:
             "builder_pubkey": builder_pubkey,
             "builder_label": builder_label,
             "block_hash": row["block_hash"],
-            "color": get_builder_color(builder_pubkey)
+            "color": get_builder_color(builder_pubkey),
+            "is_winner": is_winner
         })
 
-    return {"slot": slot_number, "bids": bids, "relays": relays, "cached": False}
+    return {"slot": slot_number, "bids": bids, "relays": relays, "winning_block_hash": winning_block_hash, "cached": False}
 
 
 def prefetch_slot_background(slot_number: int):
