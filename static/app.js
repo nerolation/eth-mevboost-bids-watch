@@ -52,7 +52,11 @@ class MEVDashboard {
             // Loading overlay elements
             loadingOverlay: document.getElementById('loadingOverlay'),
             loadingStatus: document.getElementById('loadingStatus'),
-            loadingProgressBar: document.getElementById('loadingProgressBar')
+            loadingProgressBar: document.getElementById('loadingProgressBar'),
+            // Proposer info elements
+            proposerInfo: document.getElementById('proposerInfo'),
+            proposerLabel: document.getElementById('proposerLabel'),
+            proposerIndex: document.getElementById('proposerIndex')
         };
 
         // Track initial load state
@@ -330,8 +334,13 @@ class MEVDashboard {
         this.winningBlockHash = data.winning_block_hash || null;
         this.winningBuilderLabel = data.winning_builder_label || null;
         this.blockSeenInSlot = data.block_seen_in_slot || null;
+        this.proposerLabel = data.proposer_label || null;
+        this.proposerValidatorIndex = data.proposer_validator_index || null;
         this.elapsedTime = 0;
         this.elements.slotNumber.textContent = this.currentSlot.toLocaleString();
+
+        // Update proposer info display
+        this.updateProposerInfo();
 
         // Update colors map (with LRU eviction to prevent memory growth)
         this.allBidsData.forEach(bid => {
@@ -365,6 +374,24 @@ class MEVDashboard {
             const displayName = relay.replace(/^relay-/, '').replace(/-relay$/, '');
             return `<span class="relay-tile" title="${relay}">${displayName}</span>`;
         }).join('');
+    }
+
+    updateProposerInfo() {
+        if (!this.elements.proposerLabel) return;
+
+        if (this.proposerLabel) {
+            this.elements.proposerLabel.textContent = this.proposerLabel;
+            this.elements.proposerLabel.title = this.proposerLabel;
+        } else {
+            this.elements.proposerLabel.textContent = '--';
+            this.elements.proposerLabel.title = '';
+        }
+
+        if (this.proposerValidatorIndex !== null) {
+            this.elements.proposerIndex.textContent = `#${this.proposerValidatorIndex.toLocaleString()}`;
+        } else {
+            this.elements.proposerIndex.textContent = '';
+        }
     }
 
     updateVisibleBids() {

@@ -79,6 +79,28 @@ app.add_middleware(
 # Initialize PyXatu connection (reads URL from environment variable)
 xatu = pyxatu.PyXatu(use_env_variables=True)
 
+# Load validator mapping for proposer labels
+def load_validator_mapping() -> dict:
+    """Load validator pubkey to entity mapping from xatu."""
+    try:
+        mapping = xatu.validators.mapping
+        if mapping is not None and not mapping.empty and 'pubkey' in mapping.columns:
+            # Create pubkey -> (entity, validator_index) mapping
+            result = {}
+            for _, row in mapping.iterrows():
+                pubkey = row.get('pubkey')
+                if pubkey:
+                    result[pubkey] = {
+                        'entity': row.get('entity'),
+                        'validator_index': row.get('validator_index')
+                    }
+            return result
+    except Exception as e:
+        print(f"Warning: Could not load validator mapping: {e}")
+    return {}
+
+validator_mapping = load_validator_mapping()
+
 # Genesis timestamp and slot duration for Ethereum mainnet
 GENESIS_TS = 1606824023000  # milliseconds
 SLOT_DURATION = 12000  # milliseconds
@@ -209,9 +231,9 @@ def fetch_slot_data(slot_number: int) -> dict:
     relay_df = xatu.execute_query(relay_query, columns="relay_name")
     relays = relay_df["relay_name"].tolist() if not relay_df.empty else []
 
-    # Query the winning (delivered) block_hash and builder from proposer payload delivered table
+    # Query the winning (delivered) block_hash, builder, and proposer from proposer payload delivered table
     winning_query = f"""
-        SELECT block_hash, builder_pubkey
+        SELECT block_hash, builder_pubkey, proposer_pubkey
         FROM mev_relay_proposer_payload_delivered
         WHERE meta_network_name = 'mainnet'
         AND slot_start_date_time >= '{slot_date}'
@@ -219,10 +241,22 @@ def fetch_slot_data(slot_number: int) -> dict:
         AND slot = {slot_number}
         LIMIT 1
     """
-    winning_df = xatu.execute_query(winning_query, columns="block_hash, builder_pubkey")
+    winning_df = xatu.execute_query(winning_query, columns="block_hash, builder_pubkey, proposer_pubkey")
     winning_block_hash = winning_df["block_hash"].iloc[0] if not winning_df.empty else None
     winning_builder_pubkey = winning_df["builder_pubkey"].iloc[0] if not winning_df.empty else None
     winning_builder_label = builder_dict.get(winning_builder_pubkey, winning_builder_pubkey[:10] + "...") if winning_builder_pubkey else None
+
+    # Get proposer info
+    proposer_pubkey = winning_df["proposer_pubkey"].iloc[0] if not winning_df.empty else None
+    proposer_label = None
+    proposer_validator_index = None
+    if proposer_pubkey and proposer_pubkey in validator_mapping:
+        proposer_info = validator_mapping[proposer_pubkey]
+        proposer_label = proposer_info.get('entity')
+        proposer_validator_index = proposer_info.get('validator_index')
+    if not proposer_label and proposer_pubkey:
+        # Fallback: show abbreviated pubkey
+        proposer_label = proposer_pubkey[:10] + "..." + proposer_pubkey[-6:]
 
     # Query when block was first seen in P2P network
     block_seen_in_slot = None
@@ -243,7 +277,7 @@ def fetch_slot_data(slot_number: int) -> dict:
         pass  # Block seen data is optional, don't fail if unavailable
 
     if df.empty:
-        return {"slot": slot_number, "bids": [], "relays": relays, "winning_block_hash": winning_block_hash, "winning_builder_label": winning_builder_label, "block_seen_in_slot": block_seen_in_slot, "cached": False}
+        return {"slot": slot_number, "bids": [], "relays": relays, "winning_block_hash": winning_block_hash, "winning_builder_label": winning_builder_label, "block_seen_in_slot": block_seen_in_slot, "proposer_label": proposer_label, "proposer_validator_index": proposer_validator_index, "cached": False}
 
     bids = []
     for _, row in df.iterrows():
@@ -268,7 +302,7 @@ def fetch_slot_data(slot_number: int) -> dict:
             "is_winner": is_winner
         })
 
-    return {"slot": slot_number, "bids": bids, "relays": relays, "winning_block_hash": winning_block_hash, "winning_builder_label": winning_builder_label, "block_seen_in_slot": block_seen_in_slot, "cached": False}
+    return {"slot": slot_number, "bids": bids, "relays": relays, "winning_block_hash": winning_block_hash, "winning_builder_label": winning_builder_label, "block_seen_in_slot": block_seen_in_slot, "proposer_label": proposer_label, "proposer_validator_index": proposer_validator_index, "cached": False}
 
 
 def prefetch_slot_background(slot_number: int):
