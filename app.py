@@ -79,27 +79,27 @@ app.add_middleware(
 # Initialize PyXatu connection (reads URL from environment variable)
 xatu = pyxatu.PyXatu(use_env_variables=True)
 
-# Load validator mapping for proposer labels
-def load_validator_mapping() -> dict:
-    """Load validator pubkey to entity mapping from xatu."""
+def get_proposer_info(pubkey: str) -> tuple:
+    """Look up proposer entity and validator index by pubkey using xatu.validators.mapping."""
+    if not pubkey:
+        return None, None
     try:
         mapping = xatu.validators.mapping
-        if mapping is not None and not mapping.empty and 'pubkey' in mapping.columns:
-            # Create pubkey -> (entity, validator_index) mapping
-            result = {}
-            for _, row in mapping.iterrows():
-                pubkey = row.get('pubkey')
-                if pubkey:
-                    result[pubkey] = {
-                        'entity': row.get('entity'),
-                        'validator_index': row.get('validator_index')
-                    }
-            return result
-    except Exception as e:
-        print(f"Warning: Could not load validator mapping: {e}")
-    return {}
+        if mapping is None or mapping.empty or 'pubkey' not in mapping.columns:
+            return None, None
 
-validator_mapping = load_validator_mapping()
+        # Filter to active (non-exited) validators only
+        active = mapping[~mapping['exited']]
+        row = active[active['pubkey'] == pubkey]
+        if row.empty:
+            return None, None
+
+        validator_index = int(row.iloc[0]['validator_index'])
+        entity = xatu.validators.get_validator_label(validator_index)
+        return entity, validator_index
+    except Exception as e:
+        print(f"Warning: Could not look up proposer info for {pubkey[:16]}...: {e}")
+    return None, None
 
 # Genesis timestamp and slot duration for Ethereum mainnet
 GENESIS_TS = 1606824023000  # milliseconds
@@ -248,12 +248,7 @@ def fetch_slot_data(slot_number: int) -> dict:
 
     # Get proposer info
     proposer_pubkey = winning_df["proposer_pubkey"].iloc[0] if not winning_df.empty else None
-    proposer_label = None
-    proposer_validator_index = None
-    if proposer_pubkey and proposer_pubkey in validator_mapping:
-        proposer_info = validator_mapping[proposer_pubkey]
-        proposer_label = proposer_info.get('entity')
-        proposer_validator_index = proposer_info.get('validator_index')
+    proposer_label, proposer_validator_index = get_proposer_info(proposer_pubkey)
     if not proposer_label and proposer_pubkey:
         # Fallback: show abbreviated pubkey
         proposer_label = proposer_pubkey[:10] + "..." + proposer_pubkey[-6:]
