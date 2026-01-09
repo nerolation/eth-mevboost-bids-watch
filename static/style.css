@@ -126,6 +126,13 @@ body {
     border-radius: var(--radius-sm);
 }
 
+.proposer-title {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
 .proposer-label {
     font-size: 0.875rem;
     font-weight: 600;
