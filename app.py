@@ -1,4 +1,5 @@
 import os
+import io
 import asyncio
 from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, HTTPException, BackgroundTasks
@@ -6,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
+import requests
 import pyxatu
 from functools import lru_cache
 from typing import Optional
@@ -14,6 +16,9 @@ import time
 import threading
 
 app = FastAPI(title="MEV Builder Bids Dashboard")
+
+# Pre-built validator labels with truncated pubkeys (15 bytes) for memory efficiency
+VALIDATOR_LABELS_URL = "https://raw.githubusercontent.com/nerolation/eth-mevboost-bids-watch/master/validator_labels.parquet"
 
 # Slot data cache with TTL
 class SlotCache:
@@ -77,25 +82,73 @@ app.add_middleware(
 )
 
 # Initialize PyXatu connection (reads URL from environment variable)
-xatu = pyxatu.PyXatu(use_env_variables=True)
+xatu = pyxatu.PyXatu(use_env_variables=True, no_validator_gadget=True)
+
+# Global validator labels (loaded from GitHub)
+_validator_labels: Optional[pd.DataFrame] = None
+
+
+def load_validator_labels() -> pd.DataFrame:
+    """Load pre-built validator labels from GitHub.
+
+    Returns DataFrame with columns: validator_index, entity, pubkey
+    Pubkeys are truncated to 30 hex chars (15 bytes, no 0x prefix).
+    """
+    global _validator_labels
+    if _validator_labels is not None:
+        return _validator_labels
+
+    try:
+        print(f"Loading validator labels from {VALIDATOR_LABELS_URL}...")
+        response = requests.get(VALIDATOR_LABELS_URL, timeout=60)
+        response.raise_for_status()
+        _validator_labels = pd.read_parquet(io.BytesIO(response.content))
+        print(f"Loaded {len(_validator_labels)} validator labels from GitHub")
+        return _validator_labels
+    except Exception as e:
+        print(f"Failed to load validator labels from GitHub: {e}")
+        return pd.DataFrame(columns=['validator_index', 'entity', 'pubkey'])
+
+
+def truncate_pubkey(pubkey: str) -> str:
+    """Truncate pubkey to first 15 bytes (30 hex chars) to match the pre-built mapping.
+
+    The validator labels file uses truncated pubkeys for memory efficiency.
+    Returns lowercase 30 hex chars (without '0x' prefix).
+    """
+    if pubkey is None:
+        return None
+    pubkey = pubkey.lower()
+    # Strip '0x' prefix if present
+    if pubkey.startswith('0x'):
+        pubkey = pubkey[2:]
+    # Take first 30 hex chars (15 bytes)
+    return pubkey[:30]
+
 
 def get_proposer_info(pubkey: str) -> tuple:
-    """Look up proposer entity and validator index by pubkey using xatu.validators.mapping."""
+    """Look up proposer entity and validator index by pubkey.
+
+    Uses pre-built validator labels loaded from GitHub.
+    Pubkeys are truncated to 15 bytes for memory-efficient matching.
+    """
     if not pubkey:
         return None, None
     try:
-        mapping = xatu.validators.mapping
+        mapping = load_validator_labels()
         if mapping is None or mapping.empty or 'pubkey' not in mapping.columns:
             return None, None
 
-        # Filter to active (non-exited) validators only
-        active = mapping[~mapping['exited']]
-        row = active[active['pubkey'] == pubkey]
+        # Truncate pubkey to match the pre-built mapping format
+        truncated = truncate_pubkey(pubkey)
+
+        # Look up validator
+        row = mapping[mapping['pubkey'] == truncated]
         if row.empty:
             return None, None
 
         validator_index = int(row.iloc[0]['validator_index'])
-        entity = xatu.validators.get_validator_label(validator_index)
+        entity = row.iloc[0]['entity']
         return entity, validator_index
     except Exception as e:
         print(f"Warning: Could not look up proposer info for {pubkey[:16]}...: {e}")
