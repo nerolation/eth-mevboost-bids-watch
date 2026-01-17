@@ -30,6 +30,8 @@ class MEVDashboard {
         // DOM Elements
         this.elements = {
             slotNumber: document.getElementById('slotNumber'),
+            slotInput: document.getElementById('slotInput'),
+            slotLoading: document.getElementById('slotLoading'),
             timerText: document.getElementById('timerText'),
             timerProgress: document.getElementById('timerProgress'),
             playPauseBtn: document.getElementById('playPauseBtn'),
@@ -134,8 +136,19 @@ class MEVDashboard {
         this.elements.prevBtn.addEventListener('click', () => this.goToPrevSlot());
         this.elements.nextBtn.addEventListener('click', () => this.goToNextSlot());
 
+        // Slot input handler
+        this.elements.slotInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.goToSlot(this.elements.slotInput.value.trim());
+            }
+        });
+
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
+            // Ignore if typing in the slot input
+            if (e.target === this.elements.slotInput) return;
+
             if (e.code === 'Space') {
                 e.preventDefault();
                 this.togglePlayPause();
@@ -803,6 +816,45 @@ class MEVDashboard {
         // Periodically refresh what the max available slot is
         if (this.currentSlot % 10 === 0) {
             this.refreshMaxAvailableSlot();
+        }
+    }
+
+    async goToSlot(input) {
+        // Parse and validate slot number
+        const slot = parseInt(input.replace(/,/g, ''), 10);
+        if (isNaN(slot) || slot < 0) {
+            this.updateStatus('error', 'Invalid slot number');
+            return;
+        }
+
+        // Clear input and show loading
+        this.elements.slotInput.value = '';
+        this.elements.slotInput.blur();
+        this.elements.slotLoading.classList.add('active');
+
+        // Pause playback and set the slot
+        this.isPlaying = false;
+        this.elements.playPauseBtn.classList.remove('playing');
+        this.currentSlot = slot;
+        // Set timer to 0 and elapsedTime to 16 to show all bids immediately
+        // (elapsedTime 16 means displayTime = 16 - 4 = 12, showing full slot)
+        this.timerValue = 0;
+        this.elapsedTime = 16;
+        this.updateTimerDisplay();
+        this.elements.slotNumber.textContent = this.currentSlot.toLocaleString();
+
+        try {
+            await this.loadSlotData();
+            // Override elapsedTime after loadSlotData (which resets it to 0)
+            // to show all bids immediately for the custom slot
+            this.elapsedTime = 16;
+            this.updateVisibleBids();
+            this.updateStatus('connected', `Slot ${this.currentSlot}`);
+        } catch (error) {
+            console.error('Error loading slot:', error);
+            this.updateStatus('error', `Failed to load slot ${slot}`);
+        } finally {
+            this.elements.slotLoading.classList.remove('active');
         }
     }
 }
